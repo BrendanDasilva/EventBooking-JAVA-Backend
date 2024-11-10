@@ -86,6 +86,21 @@ services:
     networks:
       - app_network
 
+  # Event-Service MongoDB
+  event-db:
+    image: mongo:latest
+    container_name: event_db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - event_db_data:/data/db
+      - ./init/mongo/docker-entrypoint-initdb.d/event-init.js:/docker-entrypoint-initdb.d/event-init.js
+    ports:
+      - "27018:27017"
+    networks:
+      - app_network
+
   # Mongo Express for MongoDB Management
   mongo-express:
     image: mongo-express
@@ -118,6 +133,22 @@ services:
     networks:
       - app_network
 
+  # Event-Service
+  event-service:
+    build:
+      context: ./event-service
+      dockerfile: Dockerfile
+    container_name: event-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATA_MONGODB_URI: mongodb://admin:password@event-db:27017/event-service?authSource=admin
+    ports:
+      - "8093:8093"
+    depends_on:
+      - event-db
+    networks:
+      - app_network
+
   # pgAdmin for PostgreSQL Management
   pgadmin:
     image: dpage/pgadmin4
@@ -134,6 +165,7 @@ volumes:
   user_db_data:
   room_db_data:
   booking_db_data:
+  event_db_data:
 
 networks:
   app_network:
