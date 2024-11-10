@@ -1,0 +1,140 @@
+version: '3.8'
+
+services:
+  # User-Service Database
+  user-db:
+    image: postgres:latest
+    container_name: user-db
+    environment:
+      POSTGRES_DB: user-service
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+      - ./user-service/src/main/resources/db.migration:/docker-entrypoint-initdb.d
+    networks:
+      - app_network
+
+  # User-Service
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://user-db:5432/user-service
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: password
+    ports:
+      - "8090:8090"
+    depends_on:
+      - user-db
+    networks:
+      - app_network
+
+  # Room-Service Database
+  room-db:
+    image: postgres:latest
+    container_name: room-db
+    environment:
+      POSTGRES_DB: room-service
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    volumes:
+      - room_db_data:/var/lib/postgresql/data
+      - ./room-service/src/main/resources/db.migration:/docker-entrypoint-initdb.d
+    networks:
+      - app_network
+
+  # Room-Service
+  room-service:
+    build:
+      context: ./room-service
+      dockerfile: Dockerfile
+    container_name: room-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://room-db:5432/room-service
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: password
+    ports:
+      - "8091:8091"
+    depends_on:
+      - room-db
+    networks:
+      - app_network
+
+  # Booking-Service MongoDB
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    hostname: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - booking_db_data:/data/db
+      - ./init/mongo/docker-entrypoint-initdb.d/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    command: mongod --auth
+    networks:
+      - app_network
+
+  # Mongo Express for MongoDB Management
+  mongo-express:
+    image: mongo-express
+    container_name: mongo-express
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password
+      ME_CONFIG_MONGODB_AUTH_DATABASE: admin
+    depends_on:
+      - mongodb
+    networks:
+      - app_network
+
+  # Booking-Service
+  booking-service:
+    build:
+      context: ./booking-service
+      dockerfile: Dockerfile
+    container_name: booking-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATA_MONGODB_URI: mongodb://admin:password@mongodb:27017/booking-service?authSource=admin
+    ports:
+      - "8092:8092"
+    depends_on:
+      - mongodb
+    networks:
+      - app_network
+
+  # pgAdmin for PostgreSQL Management
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: user@domain.ca
+      PGADMIN_DEFAULT_PASSWORD: password
+    ports:
+      - "8889:80"
+    networks:
+      - app_network
+
+volumes:
+  user_db_data:
+  room_db_data:
+  booking_db_data:
+
+networks:
+  app_network:
+    driver: bridge
