@@ -101,6 +101,21 @@ services:
     networks:
       - app_network
 
+  # Approval-Service MongoDB
+  approval-db:
+    image: mongo:latest
+    container_name: approval_db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - approval_db_data:/data/db
+      - ./init/mongo/docker-entrypoint-initdb.d/approval-init.js:/docker-entrypoint-initdb.d/approval-init.js
+    ports:
+      - "27019:27017"
+    networks:
+      - app_network
+
   # Mongo Express for MongoDB Management
   mongo-express:
     image: mongo-express
@@ -149,6 +164,26 @@ services:
     networks:
       - app_network
 
+  # Approval-Service
+  approval-service:
+    build:
+      context: ./approval-service
+      dockerfile: Dockerfile
+    container_name: approval-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATA_MONGODB_URI: mongodb://admin:password@approval-db:27017/approval-service?authSource=admin
+      FEIGN_CLIENT_EVENT_SERVICE_URL: http://event-service:8093
+      FEIGN_CLIENT_USER_SERVICE_URL: http://user-service:8090
+    ports:
+      - "8094:8094"
+    depends_on:
+      - approval-db
+      - event-service
+      - user-service
+    networks:
+      - app_network
+
   # pgAdmin for PostgreSQL Management
   pgadmin:
     image: dpage/pgadmin4
@@ -166,6 +201,7 @@ volumes:
   room_db_data:
   booking_db_data:
   event_db_data:
+  approval_db_data:
 
 networks:
   app_network:
